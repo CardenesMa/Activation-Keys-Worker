@@ -12,6 +12,7 @@ type DatabaseType =
 	UserEmail: string;
 	DateCreated: string;
 	MachineID?: string; // Optional, can be null
+	ExpiresAt: string; // ISO 8601 format
 }
 
 import KEYS from "../keys.json"
@@ -85,7 +86,7 @@ async function table(request: Request, env: Env): Promise<Response> {
  * Response is textual, 400 or 201.
  */
 async function add(request: Request, env: Env): Promise<Response> {
-	const { activation_key, user_email, admin } = await request.json() as {activation_key?: string, user_email?: string, admin?: string};
+	const { activation_key, user_email, expires, admin } = await request.json() as {activation_key?: string, user_email?: string, expires?: string, admin?: string};
 
 	if (!activation_key || !user_email || !admin) {
 		return new Response("Missing activation_key, user_email, or admin", { status: 400 });
@@ -104,13 +105,31 @@ async function add(request: Request, env: Env): Promise<Response> {
 	if (existingKey) {
 		return new Response("Activation key already exists. No change to database", { status: 409 });
 	}
+	// set expiry date if not provided
+	let formattedExpires : String; 
+
+	if (!expires) {
+		const expiryDate = new Date();
+		expiryDate.setMonth(expiryDate.getMonth() + 1); // Default to 1 month from now
+		// format the date to ISO 8601
+		formattedExpires = expiryDate.toISOString();
+	} else {
+		// validate the provided expiry date
+		const expiryDate = new Date(expires);
+		if (isNaN(expiryDate.getTime())) {
+			return new Response("Invalid expiry date format. Use ISO 8601 format.", { status: 400 });
+		}
+		formattedExpires = expiryDate.toISOString();
+	}
+
+	console.log("expires", formattedExpires);
 
 	await env.DB.prepare(
-		`INSERT INTO Keys (ActivationKey, UserEmail, MachineID, DateCreated)
-         VALUES (?, ?, ?, ?)`
-	).bind(activation_key, user_email, null, dateCreated).run();
+		`INSERT INTO Keys (ActivationKey, UserEmail, MachineID, DateCreated, ExpiresAt)
+         VALUES (?, ?, ?, ?, ?)`
+	).bind(activation_key, user_email, null, dateCreated, formattedExpires).run();
 
-	return new Response(`Activation key added: ${activation_key}, for user ${user_email} at ${dateCreated}`, { status: 201 });
+	return new Response(`Activation key added: ${activation_key}, for user ${user_email} at ${dateCreated}, Expires at ${formattedExpires}`, { status: 201 });
 };
 
 /**
@@ -159,10 +178,12 @@ async function verify(request: Request, env: Env): Promise<Response> {
 		).bind(machine_id, key).run();
 	}
 
-	// all good! 
 	return new Response(JSON.stringify({
-		activation_key: key,
-		machine_id: machine_id
+		key: result.ActivationKey,
+		machine_id: machine_id || result.MachineID,
+		user_email: result.UserEmail,
+		date_created: result.DateCreated,
+		expires_at: result.ExpiresAt
 	}), {
 		headers: { "Content-Type": "application/json" },
 		status: 200
@@ -200,6 +221,15 @@ async function remove(request: Request, env: Env): Promise<Response> {
 	if (admin !== ADMIN_KEY) {
 		return new Response("Unauthorized", { status: 403 });
 	}
+
+	// if the user isn't in the database, return 404
+	const userExists = await env.DB.prepare(
+		`SELECT * FROM Keys WHERE UserEmail = ?`
+	).bind(user_email).first();
+	if (!userExists) {
+		return new Response(`No activation key found for user ${user_email}`, { status: 409 });
+	}
+
 	const res = await env.DB.prepare(
 		specify_key? `DELETE FROM Keys WHERE UserEmail = ? AND ActivationKey = ?`
 		: `DELETE FROM Keys WHERE UserEmail = ?`

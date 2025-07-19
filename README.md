@@ -56,6 +56,7 @@ The worker will then run locally at `http://localhost:8787`.
 
 ### 1. Prepare production database
 
+Warning: This will delete the existing table!
 ```bash
 npx wrangler d1 execute activation-keys --remote --file=./keys.sql
 ```
@@ -104,6 +105,7 @@ Adds a new activation key to the database.
 {
   "activation_key": "new-activation-key",
   "user_email": "user@example.com",
+  "expires" : "2025-07-18T10:30:00.000Z",
   "admin" : "your-admin-key"
 }
 ```
@@ -136,6 +138,7 @@ Retrieves all activation keys (admin only).
     "ActivationKey": "test-key-123",
     "UserEmail": "user@example.com",
     "MachineID": "machine-xyz",
+    "ExpiresAt" : "2025-07-18T10:30:00.000Z",
     "DateCreated": "2025-07-18T10:30:00.000Z"
   }
 ]

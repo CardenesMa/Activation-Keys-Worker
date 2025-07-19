@@ -53,7 +53,7 @@ def getTable():
     except requests.exceptions.RequestException as e:
         print(f"Network error: {e}")
 
-def addKey(email, key):
+def addKey(email, key, expiry_date = None):
     """Add a new activation key to the database."""
 
     url = f"{base_url}/api/add"
@@ -61,6 +61,7 @@ def addKey(email, key):
     body = {
         "activation_key": key,
         "user_email": email,
+        "expires": expiry_date,
         "admin": admin_key
     }
     try:
@@ -128,7 +129,7 @@ if __name__ == "__main__":
 Examples:
   %(prog)s -v "KEY123" "MACHINE456"                    Verify key
   %(prog)s -a "user@email.com" "KEY123"                Add new key (admin only)
-  %(prog)s -d "user@email.com" [optional "KEY123"]     Delete key (admin only)
+  %(prog)s -d "user@email.com" [optional "KEY123", "Expiry Date (ISO 8601)"]     Delete key (admin only)
   %(prog)s -t                                          Get all keys (admin only)
 
 Configuration: Make sure to set the base_url and admin_key are set to your values in keys.py.
@@ -137,12 +138,12 @@ Configuration: Make sure to set the base_url and admin_key are set to your value
     
     parser.add_argument("-t", "--table", action="store_true", 
                        help="Get the activation keys table (requires admin)")
-    parser.add_argument("-a", "--add", nargs=2, metavar=("EMAIL", "KEY"), 
-                       help="Add a new activation key")
+    parser.add_argument("-a", "--add", nargs='+', 
+                       help="Add a new activation key. Usage: -a EMAIL KEY [EXPIRY_DATE]")
     parser.add_argument("-v", "--verify", nargs=2, metavar=("KEY", "MACHINE_ID"), 
                        help="Verify an activation key")
-    parser.add_argument("-d", "--delete", nargs=2, metavar=("EMAIL", "SPECIFY_KEY"), 
-                       help="Delete an activation key (admin only)")
+    parser.add_argument("-d", "--delete", nargs='+', metavar=("EMAIL", "SPECIFY_KEY"), 
+                       help="Delete an activation key (admin only). Usage: -d EMAIL [SPECIFY_KEY]")
 
     args = parser.parse_args()
 
@@ -155,10 +156,18 @@ Configuration: Make sure to set the base_url and admin_key are set to your value
     if args.table:
         getTable()
     elif args.add:
-        addKey(args.add[0], args.add[1])
+        email = args.add[0]
+        key = args.add[1] if len(args.add) > 1 else None
+        expiry_date = args.add[2] if len(args.add) > 2 else None
+        if key is None:
+            print(f"{Colors.RED}[ERROR]{Colors.RESET} EMAIL and KEY are required for adding a key.")
+        else:
+            addKey(email, key, expiry_date)
     elif args.verify:
         verifyKey(args.verify[0], args.verify[1])
     elif args.delete:
-        deleteKey(args.delete[0], args.delete[1])
+        email = args.delete[0]
+        specify_key = args.delete[1] if len(args.delete) > 1 else None
+        deleteKey(email, specify_key)
     else:
         parser.print_help()
