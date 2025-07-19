@@ -212,4 +212,4 @@ MIT
 
 ## Support
 
-For questions or issues, please create an issue in the repository or contact me. z
+For questions or issues, please create an issue in the repository or contact me. 
