@@ -1,0 +1,15 @@
+# so you don't accidentally commit sensitive information
+wrangler.jsonc 
+keys.json
+
+# prevent bloatware
+node_modules/
+.vscode/
+
+# prevent wrangler from uploading unnecessary files
+.wrangler/
+
+# Basic safety
+*.log
+*.env
+.DS_Store

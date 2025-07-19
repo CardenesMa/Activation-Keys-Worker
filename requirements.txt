@@ -1,0 +1,2 @@
+# Python dependencies for SonicScore Worker CLI
+requests>=2.25.0
