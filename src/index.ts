@@ -35,7 +35,7 @@ export default {
 			return table(request, env);
 		}
 
-		if (request.method === "POST" && pathname === "/api/remove") {
+		if (request.method === "DELETE" && pathname === "/api/delete") {
 			return remove(request, env);
 		}
 
@@ -59,7 +59,7 @@ async function table(request: Request, env: Env): Promise<Response> {
 		`SELECT * FROM Keys`
 	).all();
 	if (result.results.length === 0) {
-		return new Response("No activation keys found", { status: 404 });
+		return new Response(null, { status: 204 });
 	}
 	return new Response(JSON.stringify(result.results), {
 		headers: { "Content-Type": "application/json" },
@@ -96,6 +96,14 @@ async function add(request: Request, env: Env): Promise<Response> {
 	}
 
 	const dateCreated = new Date().toISOString();
+	// see if the activation key already exists
+	const existingKey: DatabaseType | null = await env.DB.prepare(
+		`SELECT * FROM Keys WHERE ActivationKey = ?`
+	).bind(activation_key).first();
+
+	if (existingKey) {
+		return new Response("Activation key already exists. No change to database", { status: 409 });
+	}
 
 	await env.DB.prepare(
 		`INSERT INTO Keys (ActivationKey, UserEmail, MachineID, DateCreated)
@@ -167,11 +175,19 @@ async function verify(request: Request, env: Env): Promise<Response> {
  * @param request The incoming request containing user details.
  * @param env The environment variables, including the database connection.
  * @returns A Response indicating the result of the operation.
+ * 
+ * @api {DELETE} /api/delete Remove Activation Key
+ * @apiName RemoveActivationKey
+ * Example request body:
+ * {
+ *   "user_email": "user@example.com",
+ *   "specify_key": "activation-key-to-remove", <-- Optional! 
+ *   "admin": "admin-secret-key"
+ * }
+ * 
  */
 async function remove(request: Request, env: Env): Promise<Response> {
-	const { user_email, admin } = await request.json() as {user_email?: string, admin?: string};
-
-	
+	const { user_email, specify_key, admin } = await request.json() as {user_email?: string, specify_key?: string, admin?: string};
 
 	if (!user_email || !admin) {
 		return new Response("Missing user_email or admin", { status: 400 });
@@ -184,10 +200,14 @@ async function remove(request: Request, env: Env): Promise<Response> {
 	if (admin !== ADMIN_KEY) {
 		return new Response("Unauthorized", { status: 403 });
 	}
+	const res = await env.DB.prepare(
+		specify_key? `DELETE FROM Keys WHERE UserEmail = ? AND ActivationKey = ?`
+		: `DELETE FROM Keys WHERE UserEmail = ?`
+	).bind(user_email, specify_key ? specify_key : null).run();
 
-	await env.DB.prepare(
-		`DELETE FROM Keys WHERE UserEmail = ?`
-	).bind(user_email).run();
-
-	return new Response(`Activation key removed for user ${user_email}`, { status: 200 });
+	if (res.meta.changes && res.meta.changes > 0) {
+		return new Response(`Activation key(s) removed for user ${user_email}`, { status: 200 });
+	} else {
+		return new Response(`No activation key found for user ${user_email}`, { status: 404 });
+	}
 }

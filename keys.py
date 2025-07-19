@@ -16,6 +16,15 @@ Usage:
 
 import requests 
 import json
+class Colors:
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    CYAN = '\033[96m'
+    WHITE = '\033[97m'
+    BOLD = '\033[1m'
+    RESET = '\033[0m'
 
 with open('keys.json', 'r') as f:
     config = json.load(f)
@@ -32,12 +41,19 @@ def getTable():
     try:
         # see what the response is
         response = requests.post(url, headers=headers, json=body)
-        print(json.loads(response.text))
+        if response.status_code == 200:
+            print(f"{Colors.GREEN}[SUCCESS]{Colors.RESET}")
+        elif response.status_code == 204:
+            print(f"{Colors.YELLOW}[INFO]{Colors.RESET} No activation keys found")
+        else:
+            print(f"{Colors.RED}[ERROR]{Colors.RESET} Status code: {response.status_code}")
+
+        print(response.text)
 
     except requests.exceptions.RequestException as e:
         print(f"Network error: {e}")
 
-def addKey(key, email):
+def addKey(email, key):
     """Add a new activation key to the database."""
 
     url = f"{base_url}/api/add"
@@ -49,8 +65,14 @@ def addKey(key, email):
     }
     try:
         response = requests.post(url, headers=headers, json=body)
-        print(f"Response ({response.status_code}):")
-        print(response.text)
+        if response.status_code == 201:
+            print(f"{Colors.GREEN}[SUCCESS]{Colors.RESET} 201 Created")
+        elif response.status_code == 409:
+            print(f"{Colors.YELLOW}[CONFLICT]{Colors.RESET} 409 Conflict - Key already exists")
+        else:
+            print(f"{Colors.RED}[ERROR]{Colors.RESET} Status code: {response.status_code}")
+
+        print(f"Response: {response.text}")
     except requests.exceptions.RequestException as e:
         print(f"Network error: {e}")
 
@@ -66,11 +88,34 @@ def verifyKey(key, machineID):
     
     try:
         response = requests.post(url, headers=headers, json=body)
-        print(f"Response ({response.status_code}):")
-        print(response.text)
+        if response.status_code == 200:
+            print(f"{Colors.GREEN}[SUCCESS]{Colors.RESET}")
+        else:
+            print(f"{Colors.RED}[ERROR]{Colors.RESET} Status code: {response.status_code}")
+        print(f"Response: {response.text}")
     except requests.exceptions.RequestException as e:
         print(f"Network error: {e}")
 
+def deleteKey(email, specify_key=None):
+    """Delete an activation key from the database (admin only)."""
+    
+    url = f"{base_url}/api/delete"
+    headers = {"Content-Type": "application/json"}
+    body = {
+        "user_email": email,
+        "specify_key": specify_key,  # Optional key to specify which key to delete
+        "admin": admin_key
+    }
+    
+    try:
+        response = requests.delete(url, headers=headers, json=body)
+        if response.status_code == 200:
+            print(f"{Colors.GREEN}[SUCCESS]{Colors.RESET}")
+        else:
+            print(f"{Colors.RED}[ERROR]{Colors.RESET} Status code: {response.status_code}")
+        print(f"Response: {response.text}")
+    except requests.exceptions.RequestException as e:
+        print(f"Network error: {e}")
 
 # CLI Interface
 if __name__ == "__main__":
@@ -81,9 +126,10 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s -t                                          Get all keys (admin)
-  %(prog)s -a "KEY123" "user@email.com" "admin-key"    Add new key
   %(prog)s -v "KEY123" "MACHINE456"                    Verify key
+  %(prog)s -a "user@email.com" "KEY123"                Add new key (admin only)
+  %(prog)s -d "user@email.com" [optional "KEY123"]     Delete key (admin only)
+  %(prog)s -t                                          Get all keys (admin only)
 
 Configuration: Make sure to set the base_url and admin_key are set to your values in keys.py.
         """
@@ -91,10 +137,12 @@ Configuration: Make sure to set the base_url and admin_key are set to your value
     
     parser.add_argument("-t", "--table", action="store_true", 
                        help="Get the activation keys table (requires admin)")
-    parser.add_argument("-a", "--add", nargs=2, metavar=("KEY", "EMAIL"), 
+    parser.add_argument("-a", "--add", nargs=2, metavar=("EMAIL", "KEY"), 
                        help="Add a new activation key")
     parser.add_argument("-v", "--verify", nargs=2, metavar=("KEY", "MACHINE_ID"), 
                        help="Verify an activation key")
+    parser.add_argument("-d", "--delete", nargs=2, metavar=("EMAIL", "SPECIFY_KEY"), 
+                       help="Delete an activation key (admin only)")
 
     args = parser.parse_args()
 
@@ -110,5 +158,7 @@ Configuration: Make sure to set the base_url and admin_key are set to your value
         addKey(args.add[0], args.add[1])
     elif args.verify:
         verifyKey(args.verify[0], args.verify[1])
+    elif args.delete:
+        deleteKey(args.delete[0], args.delete[1])
     else:
         parser.print_help()

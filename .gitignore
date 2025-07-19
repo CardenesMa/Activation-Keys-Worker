@@ -1,6 +1,7 @@
 # so you don't accidentally commit sensitive information
 wrangler.jsonc 
 keys.json
+.wrangler
 
 # prevent bloatware
 node_modules/

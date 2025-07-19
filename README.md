@@ -29,55 +29,22 @@ git clone <repository-url>
 cd Activation-Keys-Worker
 ```
 
-### 2. Install dependencies
-
-```bash
-npm install
-```
-
-### 3. Create Cloudflare D1 database
-
-```bash
-npx wrangler d1 create activation-keys
-```
-
-Note down the `database_id` from the output.
-
-### 4. Set up Wrangler configuration
-
-```bash
-cp wrangler.example.jsonc wrangler.jsonc
-```
-
-Edit `wrangler.jsonc` and enter your `database_id`:
-
-```jsonc
-{
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "activation-keys",
-      "database_id": "your-database-id-here"
-    }
-  ]
-}
-```
-
-### 5. Create database schema
-
-```bash
-npx wrangler d1 execute activation-keys --file=./keys.sql
-```
-
-### 6. Run project setup
+### 2. Run automated setup
 
 ```bash
 npm run setup
 ```
 
-This creates a `keys.json` file with your admin key and base URL.
+This automated setup script will:
+- Install all NPM dependencies
+- Create the Cloudflare D1 database
+- Set up the Wrangler configuration file
+- Create the database schema
+- Configure your admin key and base URL
 
-### 7. Start development
+**Note:** Make sure you're logged into Cloudflare first with `npx wrangler login`
+
+### 3. Start development
 
 ```bash
 npm run dev
@@ -149,6 +116,7 @@ Activation key added: new-activation-key, for user user@example.com at 2025-07-1
 **Other Responses:**
 - `400` - Missing activation key, email, or admin key
 - `403` - Unauthorized (admin key incorrect)
+- `409` - Duplicate: activation key already exists
 
 #### `POST /api/table`
 Retrieves all activation keys (admin only).
