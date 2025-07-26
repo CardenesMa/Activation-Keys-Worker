@@ -40,10 +40,35 @@ export default {
 			return remove(request, env);
 		}
 
+		if (request.method === "GET" && pathname === "/where-buy") {
+			return buyLink(request, env);
+		}
+
 		return new Response("Invalid endpoint", { status: 404 });
 	},
 } satisfies ExportedHandler<Env>;
 
+/**
+ * Should an administrator want to view the active table remotely, providing the 
+ * administration key allows the relational database to be dumped in response. 
+ * @param request Infoming request to get the table
+ * @param env Environment, including database D1 connection
+ * @returns Promise containing the contents of the D1 database
+ * 
+ * Example response : 
+ * ```json
+ * {
+ * 	[
+ * 		"db_0" : "value",
+ * 		"db_1" : "value",
+ * 		"db_n"	: "value",
+ * 	],
+ * 	[
+ * 		"..." : "..."
+ * 	]
+ * }
+ * ```
+ */
 async function table(request: Request, env: Env): Promise<Response> {
 	// make sure the ADMIN is querying the table
 	const {admin} = await request.json() as {admin?: string};
@@ -69,6 +94,34 @@ async function table(request: Request, env: Env): Promise<Response> {
 }
 
 /**
+ * Should your activation keys have a location to purchase them, this endpoint
+ * will return the link to that location. This variable should be set in your keys.json file,
+ * and any user is allowed to access this endpoint.
+ * @param request The incoming request to get the buy link.
+ * @param env The environment variables, including the database connection.
+ * @returns A Response containing the buy link.
+ * 
+ * Example respnose : 
+ * ```json 
+ * {
+ * "link" : "https://www.example.com/buy"
+ * }
+ * ```
+ */
+async function buyLink(request: Request, env: Env): Promise<Response> {
+	const buyURL = KEYS.buy_url;
+	if (!buyURL) {
+		return new Response("Buy link can't be found", { status: 500 });
+	}
+	return new Response(JSON.stringify({
+		link: buyURL,
+	}), {
+		headers: { "Content-Type": "application/json" },
+		status: 200
+	});
+}
+
+/**
  * Adds a new activation key to the database.
  * @param request The incoming request containing activation key details.
  * @param env The environment variables, including the database connection.
@@ -78,11 +131,12 @@ async function table(request: Request, env: Env): Promise<Response> {
  * @apiName AddActivationKey
  * 
  * Example request body:
+ * ```json
  * {
  *   "activation_key": "new-activation-key",
  *   "user_email": "user@example.com",
  * }
- * 
+ * ```
  * Response is textual, 400 or 201.
  */
 async function add(request: Request, env: Env): Promise<Response> {
@@ -142,15 +196,19 @@ async function add(request: Request, env: Env): Promise<Response> {
  * @returns A Response indicating the result of the operation.
  * 
  * Example request body:
+ * ```json
  * {
  *   "key": "activation-key-to-check",
  *   "machine_id": "unique-machine-id"
  * }
+ * ```
  * Example response: if the verification is successful
+ * ```json
  * {
  *   "key": "activation-key-to-check",
  *   "machine_id": "unique-machine-id"
  * } 
+ * ```
  */
 async function verify(request: Request, env: Env): Promise<Response> {
 	const { key , machine_id } = await request.json() as {key?: string, machine_id?: string};
@@ -200,11 +258,13 @@ async function verify(request: Request, env: Env): Promise<Response> {
  * @api {DELETE} /api/delete Remove Activation Key
  * @apiName RemoveActivationKey
  * Example request body:
+ * ```json
  * {
  *   "user_email": "user@example.com",
  *   "specify_key": "activation-key-to-remove", <-- Optional! 
  *   "admin": "admin-secret-key"
  * }
+ * ```
  * 
  */
 async function remove(request: Request, env: Env): Promise<Response> {

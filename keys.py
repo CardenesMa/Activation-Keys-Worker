@@ -53,6 +53,21 @@ def getTable():
     except requests.exceptions.RequestException as e:
         print(f"Network error: {e}")
 
+def getBuyLink():
+    """Get the buy link for activation keys."""
+    url = f"{base_url}/where-buy"
+    
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"{Colors.GREEN}[SUCCESS]{Colors.RESET} Buy link: {data['link']}")
+        else:
+            print(f"{Colors.RED}[ERROR]{Colors.RESET} Status code: {response.status_code}")
+            print(f"Response: {response.text}")
+    except requests.exceptions.RequestException as e:
+        print(f"Network error: {e}")
+
 def addKey(email, key, expiry_date = None):
     """Add a new activation key to the database."""
 
@@ -131,6 +146,7 @@ Examples:
   %(prog)s -a "user@email.com" "KEY123"                Add new key (admin only)
   %(prog)s -d "user@email.com" [optional "KEY123", "Expiry Date (ISO 8601)"]     Delete key (admin only)
   %(prog)s -t                                          Get all keys (admin only)
+  %(prog)s -b                                          Get the buy link for activation keys
 
 Configuration: Make sure to set the base_url and admin_key are set to your values in keys.py.
         """
@@ -144,6 +160,8 @@ Configuration: Make sure to set the base_url and admin_key are set to your value
                        help="Verify an activation key")
     parser.add_argument("-d", "--delete", nargs='+', metavar=("EMAIL", "SPECIFY_KEY"), 
                        help="Delete an activation key (admin only). Usage: -d EMAIL [SPECIFY_KEY]")
+    parser.add_argument("-b", "--buy", action="store_true", 
+                       help="Get the buy link for activation keys")
 
     args = parser.parse_args()
 
@@ -169,5 +187,7 @@ Configuration: Make sure to set the base_url and admin_key are set to your value
         email = args.delete[0]
         specify_key = args.delete[1] if len(args.delete) > 1 else None
         deleteKey(email, specify_key)
+    elif args.buy:
+        getBuyLink()
     else:
         parser.print_help()
