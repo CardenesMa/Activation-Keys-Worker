@@ -104,6 +104,7 @@ if __name__ == "__main__":
     
     admin_key = input(f"{Colors.YELLOW}Custom Admin Key: {Colors.RESET}")
     base_url = input(f"{Colors.YELLOW}Cloudflare Worker URL (leave empty for local development): {Colors.RESET}")
+    buy_url = input(f"{Colors.YELLOW}URL to Buy Activation Keys (can be configured later): {Colors.RESET}")
     
     if not admin_key:
         print(f"{Colors.RED}[ERROR]{Colors.RESET} Admin Key is required.")
@@ -115,8 +116,9 @@ if __name__ == "__main__":
     
     # Save configuration to keys.json
     config = {
-        "admin_key": admin_key,
-        "base_url": base_url
+        "admin_keys":[admin_key],
+        "base_url": base_url,
+        "buy_url": buy_url
     }
     
     with open('keys.json', 'w') as f:

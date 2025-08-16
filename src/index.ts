@@ -5,7 +5,7 @@ export interface Env {
 // Developed using : https://developers.cloudflare.com/d1/get-started/#populate-your-d1-database
 
 
-// Mirrors what the keys table looks like
+// Mirrors what the keys table looks like in keys.sql. It is imperative that they match.
 type DatabaseType = 
 {
 	ActivationKey: string;
@@ -16,13 +16,14 @@ type DatabaseType =
 }
 
 import KEYS from "../keys.json"
-const ADMIN_KEY = KEYS.admin_key; // Use the admin key from keys.json
+const ADMIN_KEYS = KEYS.admin_keys; // Use the admin key from keys.json
 
 export default {
 	async fetch(request, env: Env): Promise<Response> {
 		const url = new URL(request.url);
 		const pathname = url.pathname;
 
+		// verify the requested admin key, and attach a machine ID if needed
 		if (request.method === "POST" && pathname === "/api/verify") {
 			return verify(request, env);
 		}
@@ -31,15 +32,18 @@ export default {
 		if (request.method === "POST" && pathname === "/api/add") {
 			return add(request, env);
 		}
-
+		
+		// Let the administrator see the current table of users
 		if(request.method === "POST" && pathname === "/api/table") {
 			return table(request, env);
 		}
 
+		// Remove a given key from the database (requires admin)
 		if (request.method === "DELETE" && pathname === "/api/delete") {
 			return remove(request, env);
 		}
 
+		// Determine where one can buy activation keys
 		if (request.method === "GET" && pathname === "/where-buy") {
 			return buyLink(request, env);
 		}
@@ -73,11 +77,11 @@ async function table(request: Request, env: Env): Promise<Response> {
 	// make sure the ADMIN is querying the table
 	const {admin} = await request.json() as {admin?: string};
 
-	const adminKey = ADMIN_KEY;
-	if (!adminKey) {
-		return new Response("ADMIN_KEY is not set in the environment variables.", { status: 500 });
+	const adminKeys = ADMIN_KEYS;
+	if (!adminKeys || adminKeys.length === 0) {
+		return new Response("ADMIN_KEYS is not set in the environment variables.", { status: 500 });
 	}
-	if (!admin || admin !== adminKey) {
+	if (!admin || !adminKeys.includes(admin)) {
 		return new Response("Unauthorized", { status: 403 });
 	}
 
@@ -104,7 +108,7 @@ async function table(request: Request, env: Env): Promise<Response> {
  * Example respnose : 
  * ```json 
  * {
- * "link" : "https://www.example.com/buy"
+ * 	"link" : "https://www.example.com/buy"
  * }
  * ```
  */
@@ -135,6 +139,8 @@ async function buyLink(request: Request, env: Env): Promise<Response> {
  * {
  *   "activation_key": "new-activation-key",
  *   "user_email": "user@example.com",
+ *   "expires" : "ISO-String",
+ *   "admin" : "my-admin-key"
  * }
  * ```
  * Response is textual, 400 or 201.
@@ -146,7 +152,7 @@ async function add(request: Request, env: Env): Promise<Response> {
 		return new Response("Missing activation_key, user_email, or admin", { status: 400 });
 	}
 
-	if (admin !== ADMIN_KEY) {
+	if (!ADMIN_KEYS.includes(admin)) {
 		return new Response("Unauthorized", { status: 403 });
 	}
 
@@ -274,11 +280,11 @@ async function remove(request: Request, env: Env): Promise<Response> {
 		return new Response("Missing user_email or admin", { status: 400 });
 	}
 
-	if(!ADMIN_KEY) {
+	if(!ADMIN_KEYS) {
 		return new Response("ADMIN_KEY is not set in the environment variables.", { status: 500 });
 	}
 
-	if (admin !== ADMIN_KEY) {
+	if (!ADMIN_KEYS.includes(admin)) {
 		return new Response("Unauthorized", { status: 403 });
 	}
 
